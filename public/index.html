@@ -6,7 +6,13 @@
     <title>VEER – WhatsApp Blaster</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
+    </script>
+
     <style>
+        /* ── RESET & BASE ── */
         *,
         *::before,
         *::after {
@@ -34,6 +40,7 @@
             font-family: 'Inter', sans-serif;
             color: var(--text);
             overflow-x: hidden;
+            background: #060a12;
         }
 
         body {
@@ -41,16 +48,24 @@
             flex-direction: column;
             align-items: center;
             padding: 0 0 80px;
-            background: #060a12;
+            position: relative;
         }
 
-        #bg-canvas {
+        /* ── THREE.JS CONTAINER (background) ── */
+        #three-container {
             position: fixed;
             inset: 0;
             z-index: 0;
             pointer-events: none;
+            background: #060a12;
+        }
+        #three-container canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
         }
 
+        /* ── PAGE STACK ── */
         .page {
             position: relative;
             z-index: 2;
@@ -59,7 +74,7 @@
             padding: 0 16px;
         }
 
-        /* TOPBAR */
+        /* ── TOPBAR ── */
         .topbar {
             position: relative;
             z-index: 3;
@@ -67,18 +82,22 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 28px;
+            padding: 14px 28px;
             margin-bottom: 32px;
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(30px);
             -webkit-backdrop-filter: blur(30px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
+
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            flex: 1;
+            justify-content: center;
         }
+
         .brand-logo {
             width: 42px;
             height: 42px;
@@ -89,22 +108,58 @@
             justify-content: center;
             font-size: 21px;
             box-shadow: 0 0 24px rgba(37, 211, 102, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            flex-shrink: 0;
         }
+
+        .brand-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1.2;
+        }
+
+        /* ── VEER text with 6‑color cycling (no blur) ── */
         .brand-text .name {
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             font-weight: 800;
             letter-spacing: 4px;
-            background: linear-gradient(90deg, #25d366, #a8ffcb);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            animation: veerColorCycle 6s ease-in-out infinite;
+            text-shadow: 0 0 30px rgba(37, 211, 102, 0.25);
+            /* no blur filter */
         }
+
+        @keyframes veerColorCycle {
+            0% {
+                color: #ff4757;
+            }
+            16.66% {
+                color: #ff6b35;
+            }
+            33.33% {
+                color: #ffd93d;
+            }
+            50% {
+                color: #2ed573;
+            }
+            66.66% {
+                color: #1e90ff;
+            }
+            83.33% {
+                color: #a855f7;
+            }
+            100% {
+                color: #ff4757;
+            }
+        }
+
         .brand-text .sub {
-            font-size: 0.6rem;
+            font-size: 0.55rem;
             letter-spacing: 2.5px;
             color: var(--subtext);
             text-transform: uppercase;
             margin-top: 1px;
         }
+
         .online-badge {
             display: flex;
             align-items: center;
@@ -117,7 +172,9 @@
             font-weight: 600;
             color: var(--green);
             letter-spacing: 1.5px;
+            flex-shrink: 0;
         }
+
         .online-dot {
             width: 6px;
             height: 6px;
@@ -126,6 +183,7 @@
             box-shadow: 0 0 8px var(--green);
             animation: blink 1.5s ease-in-out infinite;
         }
+
         @keyframes blink {
             0%,
             100% {
@@ -136,7 +194,7 @@
             }
         }
 
-        /* GLASS CARD */
+        /* ── GLASS CARD ── */
         .glass-card {
             background: rgba(255, 255, 255, 0.06);
             backdrop-filter: var(--blur);
@@ -201,7 +259,7 @@
             margin-top: 2px;
         }
 
-        /* FILE DROP */
+        /* ── FILE DROP ── */
         .file-drop {
             display: flex;
             flex-direction: column;
@@ -526,20 +584,99 @@
             margin-top: 12px;
         }
 
+        /* ── AI AGENT SECTION – NO BLUR, SIMPLE & CLEAR ── */
+        .ai-agent-clear {
+            /* no blur filter, just clean glass */
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: none;
+            /* removed blur */
+            -webkit-backdrop-filter: none;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .ai-agent-clear .label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--subtext);
+        }
+
+        .ai-agent-clear .value {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text);
+            background: rgba(37, 211, 102, 0.08);
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(37, 211, 102, 0.15);
+        }
+
+        .ai-agent-clear .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 10px rgba(37, 211, 102, 0.3);
+            display: inline-block;
+            margin-right: 6px;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
         @media (max-width: 480px) {
             .glass-card {
                 padding: 20px 16px;
             }
             .topbar {
-                padding: 14px 16px;
+                padding: 12px 14px;
+                flex-wrap: nowrap;
+            }
+            .brand {
+                gap: 6px;
+            }
+            .brand-logo {
+                width: 34px;
+                height: 34px;
+                font-size: 17px;
+            }
+            .brand-text .name {
+                font-size: 1.1rem;
+                letter-spacing: 2px;
+            }
+            .brand-text .sub {
+                font-size: 0.45rem;
+                letter-spacing: 1.5px;
+            }
+            .online-badge {
+                padding: 4px 10px;
+                font-size: 0.55rem;
+                letter-spacing: 1px;
+            }
+            .ai-agent-clear {
+                padding: 12px 14px;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .ai-agent-clear .value {
+                font-size: 0.75rem;
+                padding: 2px 10px;
             }
         }
     </style>
 </head>
 <body>
 
-    <canvas id="bg-canvas"></canvas>
+    <!-- ── THREE.JS BACKGROUND ── -->
+    <div id="three-container"></div>
 
+    <!-- ── TOPBAR ── -->
     <div class="topbar" style="max-width:none;">
         <div class="brand">
             <div class="brand-logo">💬</div>
@@ -554,10 +691,20 @@
         </div>
     </div>
 
+    <!-- ── PAGE ── -->
     <div class="page">
 
         <!-- ── MAIN CARD ── -->
         <div class="glass-card active">
+
+            <!-- ✦ AI AGENT – CLEAR, NO BLUR ✦ -->
+            <div class="ai-agent-clear">
+                <span class="label">🤖 AI Agent</span>
+                <span class="value">
+                    <span class="status-dot"></span> VEER · WhatsApp Blaster
+                </span>
+                <span style="font-size:0.7rem;color:var(--subtext);">Ready</span>
+            </div>
 
             <!-- Creds Upload -->
             <div class="card-hd">
@@ -703,6 +850,120 @@
     </div>
 
     <script>
+        // ── THREE.JS 3D WIREFRAME MESH BACKGROUND ──
+        (function initThree() {
+            const container = document.getElementById('three-container');
+            const W = window.innerWidth,
+                H = window.innerHeight;
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x060a12);
+
+            const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+            camera.position.set(0, 0, 8);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: false,
+            });
+            renderer.setSize(W, H);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // ── MAIN WIREFRAME: Torus Knot ──
+            const geoMain = new THREE.TorusKnotGeometry(2.2, 0.7, 140, 20);
+            const edgesMain = new THREE.EdgesGeometry(geoMain);
+            const matMain = new THREE.LineBasicMaterial({
+                color: 0x25d366,
+                transparent: true,
+                opacity: 0.55,
+            });
+            const wireMain = new THREE.LineSegments(edgesMain, matMain);
+            scene.add(wireMain);
+
+            // ── SECONDARY WIREFRAME: Icosahedron ──
+            const geoSec = new THREE.IcosahedronGeometry(3.4, 0);
+            const edgesSec = new THREE.EdgesGeometry(geoSec);
+            const matSec = new THREE.LineBasicMaterial({
+                color: 0x1a9e5e,
+                transparent: true,
+                opacity: 0.15,
+            });
+            const wireSec = new THREE.LineSegments(edgesSec, matSec);
+            scene.add(wireSec);
+
+            // ── TERTIARY: small Octahedron ──
+            const geoTer = new THREE.OctahedronGeometry(1.8, 0);
+            const edgesTer = new THREE.EdgesGeometry(geoTer);
+            const matTer = new THREE.LineBasicMaterial({
+                color: 0x4ade80,
+                transparent: true,
+                opacity: 0.10,
+            });
+            const wireTer = new THREE.LineSegments(edgesTer, matTer);
+            scene.add(wireTer);
+
+            // ── GLOWY DOTS AT VERTICES ──
+            const dotPositions = [];
+            const posAttr = geoMain.attributes.position;
+            if (posAttr) {
+                const arr = posAttr.array;
+                for (let i = 0; i < arr.length; i += 3) {
+                    dotPositions.push(arr[i], arr[i + 1], arr[i + 2]);
+                }
+            }
+            const dotGeo = new THREE.BufferGeometry();
+            dotGeo.setAttribute('position', new THREE.Float32BufferAttribute(dotPositions, 3));
+            const dotMat = new THREE.PointsMaterial({
+                color: 0x4ade80,
+                size: 0.04,
+                transparent: true,
+                opacity: 0.5,
+                blending: THREE.AdditiveBlending,
+            });
+            const dots = new THREE.Points(dotGeo, dotMat);
+            scene.add(dots);
+
+            // ── RESIZE ──
+            function onResize() {
+                const w = window.innerWidth,
+                    h = window.innerHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
+            window.addEventListener('resize', onResize);
+
+            // ── ANIMATE ──
+            function animate() {
+                requestAnimationFrame(animate);
+                const t = performance.now() * 0.0004;
+
+                wireMain.rotation.x = t * 0.6;
+                wireMain.rotation.y = t * 0.9;
+                wireMain.rotation.z = t * 0.3;
+
+                wireSec.rotation.x = -t * 0.25;
+                wireSec.rotation.y = t * 0.35;
+                wireSec.rotation.z = -t * 0.15;
+
+                wireTer.rotation.x = t * 0.5;
+                wireTer.rotation.y = -t * 0.7;
+                wireTer.rotation.z = t * 0.2;
+
+                dots.rotation.x = t * 0.6;
+                dots.rotation.y = t * 0.9;
+                dots.rotation.z = t * 0.3;
+
+                renderer.render(scene, camera);
+            }
+            animate();
+        })();
+    </script>
+
+    <script>
+        // ── APP LOGIC ──
         const API = window.location.origin;
         let sessionId = '';
         let statsInterval = null;
@@ -780,19 +1041,22 @@
                     document.getElementById('statusMsg').textContent = '✅ WhatsApp connected via creds.json';
                     document.getElementById('statusDot2').className = 'dot green';
                     document.getElementById('statusText').textContent = 'Connected';
-                    document.getElementById('statusDot').className = 'online-dot';
+                    document.getElementById('statusDot').style.background = '#25d366';
+                    document.getElementById('statusDot').style.boxShadow = '0 0 8px #25d366';
                     document.getElementById('messagingSection').style.display = 'block';
                 } else {
                     showResult('credsResult', 'error', `<strong>❌ ${data.message}</strong>`);
                     document.getElementById('credsStatusBox').style.display = 'none';
                     document.getElementById('statusText').textContent = 'Error';
                     document.getElementById('statusDot').style.background = 'var(--red)';
+                    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
                 }
             } catch (err) {
                 document.getElementById('credsSpinner').classList.remove('on');
                 showResult('credsResult', 'error', `<strong>❌ ${err.message}</strong>`);
                 document.getElementById('statusText').textContent = 'Error';
                 document.getElementById('statusDot').style.background = 'var(--red)';
+                document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
             }
             btn.disabled = false;
         }
@@ -933,6 +1197,7 @@
                     sessionId = '';
                     document.getElementById('statusText').textContent = 'Disconnected';
                     document.getElementById('statusDot').style.background = 'var(--red)';
+                    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
                     document.getElementById('credsStatusBox').style.display = 'none';
                     document.getElementById('liveStats').style.display = 'none';
                 } else {
@@ -969,107 +1234,6 @@
             if (params.get('auto') === '1') {
                 setTimeout(() => document.getElementById('loadCredsBtn').click(), 300);
             }
-        })();
-    </script>
-
-    <!-- ANIMATED BACKGROUND -->
-    <script>
-        (function() {
-            const canvas = document.getElementById('bg-canvas');
-            const ctx = canvas.getContext('2d');
-
-            const orbs = [
-                { x: .15, y: .20, r: .38, vx: .00013, vy: .00009, c: [30, 180, 100] },
-                { x: .78, y: .15, r: .32, vx: -.00011, vy: .00013, c: [10, 120, 180] },
-                { x: .50, y: .70, r: .36, vx: .00009, vy: -.00011, c: [80, 200, 130] },
-                { x: .85, y: .65, r: .28, vx: -.00015, vy: -.00007, c: [20, 160, 140] },
-                { x: .20, y: .58, r: .26, vx: .00011, vy: .00015, c: [0, 100, 200] },
-                { x: .60, y: .35, r: .30, vx: -.00008, vy: .00010, c: [50, 220, 100] },
-            ];
-
-            const particles = Array.from({ length: 60 }, () => ({
-                x: Math.random(),
-                y: Math.random(),
-                r: 0.3 + Math.random() * 1.2,
-                vx: (Math.random() - 0.5) * 0.00015,
-                vy: (Math.random() - 0.5) * 0.00015,
-                alpha: 0.2 + Math.random() * 0.5
-            }));
-
-            function resize() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resize);
-            resize();
-
-            let t = 0;
-
-            function draw() {
-                const W = canvas.width,
-                    H = canvas.height;
-                ctx.clearRect(0, 0, W, H);
-
-                const bg = ctx.createLinearGradient(0, 0, W, H);
-                bg.addColorStop(0, '#030810');
-                bg.addColorStop(0.5, '#060d14');
-                bg.addColorStop(1, '#040b10');
-                ctx.fillStyle = bg;
-                ctx.fillRect(0, 0, W, H);
-
-                orbs.forEach(o => {
-                    o.x += o.vx;
-                    o.y += o.vy;
-                    if (o.x < 0 || o.x > 1) o.vx *= -1;
-                    if (o.y < 0 || o.y > 1) o.vy *= -1;
-                    const cx = o.x * W,
-                        cy = o.y * H;
-                    const rad = o.r * Math.max(W, H);
-                    const breathe = 1 + 0.05 * Math.sin(t * 0.7 + o.x * 8);
-                    const [r, g, b] = o.c;
-                    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad * breathe);
-                    gr.addColorStop(0, `rgba(${r},${g},${b},0.35)`);
-                    gr.addColorStop(0.4, `rgba(${r},${g},${b},0.12)`);
-                    gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
-                    ctx.save();
-                    ctx.filter = 'blur(55px)';
-                    ctx.fillStyle = gr;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, rad * breathe, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.restore();
-                });
-
-                ctx.strokeStyle = 'rgba(37,211,102,0.025)';
-                ctx.lineWidth = 0.5;
-                const gs = 50;
-                for (let x = 0; x < W; x += gs) { ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, H);
-                    ctx.stroke(); }
-                for (let y = 0; y < H; y += gs) { ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(W, y);
-                    ctx.stroke(); }
-
-                particles.forEach(p => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    if (p.x < 0) p.x = 1;
-                    if (p.x > 1) p.x = 0;
-                    if (p.y < 0) p.y = 1;
-                    if (p.y > 1) p.y = 0;
-                    const pulse = p.alpha * (0.7 + 0.3 * Math.sin(t * 1.2 + p.x * 20));
-                    ctx.beginPath();
-                    ctx.arc(p.x * W, p.y * H, p.r, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(37,211,102,${pulse})`;
-                    ctx.fill();
-                });
-
-                t += 0.016;
-                requestAnimationFrame(draw);
-            }
-            draw();
         })();
     </script>
 
