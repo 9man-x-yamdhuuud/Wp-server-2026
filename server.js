@@ -123,7 +123,6 @@ const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed)
 const connectAndLogin = async (uniqueKey, credsData) => {
   const sessionPath = `./sessions/${uniqueKey}.json`;
 
-  // Write uploaded creds.json to session file
   if (credsData) {
     fs.mkdirSync('./sessions', { recursive: true });
     fs.writeFileSync(sessionPath, credsData);
@@ -171,7 +170,6 @@ const connectAndLogin = async (uniqueKey, credsData) => {
           };
           saveSessions();
 
-          // Resume messaging if previously set
           if (userSessions[uniqueKey]?.messaging && userSessions[uniqueKey]?.messages) {
             const { target, hatersName, messages, speed } = userSessions[uniqueKey];
             console.log(chalk.cyan(`🔄 Resuming messaging for ${uniqueKey}...`));
@@ -265,8 +263,6 @@ const restoreSessions = async () => {
 };
 
 // ---------- Routes ----------
-
-// Login with creds.json upload
 app.post('/login', upload.single('credsFile'), async (req, res) => {
   try {
     if (!req.file) {
@@ -274,13 +270,12 @@ app.post('/login', upload.single('credsFile'), async (req, res) => {
     }
 
     const credsData = fs.readFileSync(req.file.path);
-    removeFile(req.file.path);  // clean temp
+    removeFile(req.file.path);
 
     const uniqueKey = generateUniqueKey();
     stopFlags[uniqueKey] = { stopped: false };
     reconnectAttempts[uniqueKey] = 0;
 
-    // Store basic info
     userSessions[uniqueKey] = {
       uniqueKey,
       connected: false,
@@ -289,7 +284,6 @@ app.post('/login', upload.single('credsFile'), async (req, res) => {
     };
     saveSessions();
 
-    // Start connection with the uploaded creds
     await connectAndLogin(uniqueKey, credsData);
 
     res.json({
@@ -303,7 +297,6 @@ app.post('/login', upload.single('credsFile'), async (req, res) => {
   }
 });
 
-// Get groups (optional)
 app.post('/getGroupUID', async (req, res) => {
   try {
     const { uniqueKey } = req.body;
@@ -327,7 +320,6 @@ app.post('/getGroupUID', async (req, res) => {
   }
 });
 
-// Start messaging
 app.post('/startMessaging', upload.single('messageFile'), async (req, res) => {
   try {
     const { uniqueKey, target, hatersName, speed } = req.body;
@@ -376,7 +368,6 @@ app.post('/startMessaging', upload.single('messageFile'), async (req, res) => {
   }
 });
 
-// Get session status
 app.get('/sessionStatus/:uniqueKey', (req, res) => {
   const { uniqueKey } = req.params;
   const session = userSessions[uniqueKey];
@@ -397,7 +388,6 @@ app.get('/sessionStatus/:uniqueKey', (req, res) => {
   });
 });
 
-// Stop & logout
 app.post('/stop', async (req, res) => {
   const { uniqueKey } = req.body;
   if (!uniqueKey) return res.status(400).json({ success: false, message: 'Missing uniqueKey' });
@@ -431,7 +421,6 @@ app.post('/stop', async (req, res) => {
   }
 });
 
-// Serve HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
