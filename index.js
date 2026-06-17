@@ -2,7 +2,13 @@ import express from 'express';
 import fs from 'fs';
 import chalk from 'chalk';
 import multer from 'multer';
-import makeWASocket, { useMultiFileAuthState, makeCacheableSignalKeyStore, DisconnectReason, Browsers, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
+import makeWASocket, {
+  useMultiFileAuthState,
+  makeCacheableSignalKeyStore,
+  DisconnectReason,
+  Browsers,
+  fetchLatestBaileysVersion
+} from '@whiskeysockets/baileys';
 import pino from 'pino';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -17,8 +23,8 @@ const PORT = process.env.PORT || 5000;
 const upload = multer({ dest: 'uploads/' });
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 
 const SESSION_FILE = './running_sessions.json';
@@ -55,43 +61,43 @@ const checkSessionExpiry = (sessionTimestamp, sessionMeta) => {
   return (Date.now() - sessionTimestamp) > EXPIRY_TIME;
 };
 
-const cleanupSession = (uniqueKey) => {
-  if (stopFlags[uniqueKey]?.interval) {
-    clearInterval(stopFlags[uniqueKey].interval);
+const cleanupSession = (sessionId) => {
+  if (stopFlags[sessionId]?.interval) {
+    clearInterval(stopFlags[sessionId].interval);
   }
-  delete stopFlags[uniqueKey];
-  delete messageQueues[uniqueKey];
-  delete activeSockets[uniqueKey];
+  delete stopFlags[sessionId];
+  delete messageQueues[sessionId];
+  delete activeSockets[sessionId];
 };
 
-const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed) => {
-  if (stopFlags[uniqueKey]?.interval) {
-    clearInterval(stopFlags[uniqueKey].interval);
+const startMessaging = (MznKing, sessionId, target, hatersName, messages, speed) => {
+  if (stopFlags[sessionId]?.interval) {
+    clearInterval(stopFlags[sessionId].interval);
   }
 
-  if (!messageQueues[uniqueKey]) {
-    messageQueues[uniqueKey] = {
+  if (!messageQueues[sessionId]) {
+    messageQueues[sessionId] = {
       messages: [...messages],
       currentIndex: 0,
       isSending: false
     };
   }
 
-  if (!sessionStats[uniqueKey]) {
-    sessionStats[uniqueKey] = { sent: 0, failed: 0, lastMessage: '' };
+  if (!sessionStats[sessionId]) {
+    sessionStats[sessionId] = { sent: 0, failed: 0, lastMessage: '' };
   }
 
-  const queue = messageQueues[uniqueKey];
+  const queue = messageQueues[sessionId];
 
   const sendNextMessage = async () => {
-    if (stopFlags[uniqueKey]?.stopped) {
-      clearInterval(stopFlags[uniqueKey].interval);
-      delete messageQueues[uniqueKey];
+    if (stopFlags[sessionId]?.stopped) {
+      clearInterval(stopFlags[sessionId].interval);
+      delete messageQueues[sessionId];
       return;
     }
 
-    if (!activeSockets[uniqueKey]) {
-      console.log(chalk.yellow(`⚠️ Socket disconnected for ${uniqueKey}, waiting for reconnection...`));
+    if (!activeSockets[sessionId]) {
+      console.log(chalk.yellow(`⚠️ Socket disconnected for ${sessionId}, waiting for reconnection...`));
       return;
     }
 
@@ -100,7 +106,6 @@ const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed)
 
     queue.isSending = true;
 
-    // Support both group IDs and personal numbers
     let chatId;
     if (target.includes('@g.us') || target.includes('@s.whatsapp.net')) {
       chatId = target;
@@ -114,9 +119,9 @@ const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed)
 
     try {
       await MznKing.sendMessage(chatId, { text: formattedMessage });
-      sessionStats[uniqueKey].sent++;
-      sessionStats[uniqueKey].lastMessage = formattedMessage.substring(0, 60);
-      console.log(chalk.green(`✉️ [${sessionStats[uniqueKey].sent}] Sent to ${chatId}: ${formattedMessage.substring(0, 50)}...`));
+      sessionStats[sessionId].sent++;
+      sessionStats[sessionId].lastMessage = formattedMessage.substring(0, 60);
+      console.log(chalk.green(`✉️ [${sessionStats[sessionId].sent}] Sent to ${chatId}: ${formattedMessage.substring(0, 50)}...`));
 
       queue.currentIndex++;
       if (queue.currentIndex >= queue.messages.length) {
@@ -124,7 +129,7 @@ const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed)
         queue.currentIndex = 0;
       }
     } catch (err) {
-      sessionStats[uniqueKey].failed++;
+      sessionStats[sessionId].failed++;
       console.error(chalk.red(`❌ Send failed: ${err.message}`));
     } finally {
       queue.isSending = false;
@@ -133,176 +138,179 @@ const startMessaging = (MznKing, uniqueKey, target, hatersName, messages, speed)
 
   const interval = parseInt(speed) * 1000;
   const messageInterval = setInterval(sendNextMessage, interval);
-  stopFlags[uniqueKey] = { stopped: false, interval: messageInterval };
+  stopFlags[sessionId] = { stopped: false, interval: messageInterval };
   console.log(chalk.cyan(`📨 Messaging started! Every ${speed}s → ${target}`));
 
   sendNextMessage();
 };
 
-const connectAndLogin = async (phoneNumber, uniqueKey, sendPairingCode = null) => {
-  const sessionPath = `./session/${uniqueKey}`;
-  let pairingCodeSent = false;
+// ─── CORE: Initialize socket with session path ────────────────────────────
+const initSocket = async (sessionId, sessionPath, onPairingCode = null) => {
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+    const { version } = await fetchLatestBaileysVersion();
 
-  const startConnection = async () => {
-    try {
-      console.log(chalk.magenta(`🚀 Connecting ${phoneNumber} [${uniqueKey}]`));
+    const MznKing = makeWASocket({
+      version,
+      logger: pino.default({ level: 'silent' }),
+      browser: Browsers.windows('Firefox'),
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino.default({ level: 'silent' }))
+      },
+      printQRInTerminal: false,
+      generateHighQualityLinkPreview: true,
+      markOnlineOnConnect: true,
+      getMessage: async () => undefined,
+      keepAliveIntervalMs: 30000,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: undefined,
+      retryRequestDelayMs: 250,
+    });
 
-      if (!fs.existsSync(sessionPath)) {
-        fs.mkdirSync(sessionPath, { recursive: true });
-      }
+    activeSockets[sessionId] = MznKing;
 
-      const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-      const { version } = await fetchLatestBaileysVersion();
-
-      const MznKing = makeWASocket({
-        version,
-        logger: pino.default({ level: 'silent' }),
-        browser: Browsers.windows('Firefox'),
-        auth: {
-          creds: state.creds,
-          keys: makeCacheableSignalKeyStore(state.keys, pino.default({ level: 'silent' }))
-        },
-        printQRInTerminal: false,
-        generateHighQualityLinkPreview: true,
-        markOnlineOnConnect: true,
-        getMessage: async () => undefined,
-        keepAliveIntervalMs: 30000,
-        connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: undefined,
-        retryRequestDelayMs: 250,
-      });
-
-      activeSockets[uniqueKey] = MznKing;
-
-      if (!MznKing.authState.creds.registered && !pairingCodeSent && sendPairingCode) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        try {
-          const cleanedNumber = phoneNumber.replace(/[^0-9]/g, '');
-          console.log(chalk.cyan(`🔐 Requesting pairing code for ${cleanedNumber}...`));
-
-          const code = await MznKing.requestPairingCode(cleanedNumber);
+    // If creds not registered and we have a pairing code callback, request one
+    if (!MznKing.authState.creds.registered && onPairingCode) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      try {
+        const phoneNumber = userSessions[sessionId]?.phoneNumber?.replace(/[^0-9]/g, '') || '';
+        if (phoneNumber) {
+          const code = await MznKing.requestPairingCode(phoneNumber);
           const pairingCode = code?.match(/.{1,4}/g)?.join('-') || code;
-
-          console.log(chalk.green(`✅ Pairing Code: ${pairingCode}`));
-
-          if (!pairingCodeSent) {
-            pairingCodeSent = true;
-            sendPairingCode(pairingCode, false);
-          }
-        } catch (error) {
-          console.error(chalk.red(`❌ Pairing error: ${error.message}`));
-          if (!pairingCodeSent && sendPairingCode) {
-            pairingCodeSent = true;
-            sendPairingCode(null, false, error.message);
-          }
+          onPairingCode(pairingCode, false);
         }
-      } else if (MznKing.authState.creds.registered) {
-        console.log(chalk.green(`✅ Session already registered for ${uniqueKey}`));
-        if (!pairingCodeSent && sendPairingCode) {
-          pairingCodeSent = true;
-          sendPairingCode(null, true);
-        }
+      } catch (error) {
+        console.error(chalk.red(`❌ Pairing error: ${error.message}`));
+        if (onPairingCode) onPairingCode(null, false, error.message);
       }
-
-      MznKing.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
-        if (connection === 'open') {
-          console.log(chalk.green(`✅✅✅ Connected! [${uniqueKey}]`));
-          reconnectAttempts[uniqueKey] = 0;
-
-          userSessions[uniqueKey] = {
-            ...userSessions[uniqueKey],
-            phoneNumber,
-            uniqueKey,
-            connected: true,
-            lastUpdateTimestamp: Date.now()
-          };
-          saveSessions();
-
-          if (!pairingCodeSent && sendPairingCode) {
-            pairingCodeSent = true;
-            sendPairingCode(null, true);
-          }
-
-          if (userSessions[uniqueKey]?.messaging && userSessions[uniqueKey]?.messages) {
-            const { target, hatersName, messages, speed } = userSessions[uniqueKey];
-            console.log(chalk.cyan(`🔄 Resuming messaging for ${uniqueKey}...`));
-            if (!messageQueues[uniqueKey]) {
-              messageQueues[uniqueKey] = {
-                messages: [...messages],
-                currentIndex: 0,
-                isSending: false
-              };
-            }
-            startMessaging(MznKing, uniqueKey, target, hatersName, messages, speed);
-          }
-        }
-
-        if (connection === 'close') {
-          const statusCode = lastDisconnect?.error?.output?.statusCode;
-          const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-
-          console.log(chalk.red(`⚠️ Connection closed - Status: ${statusCode}, Reason: ${reason}`));
-
-          if (reason === DisconnectReason.badSession) {
-            console.log(chalk.red(`Bad session, deleting and reconnecting...`));
-            removeDir(sessionPath);
-          } else if (reason === DisconnectReason.connectionReplaced) {
-            console.log(chalk.red(`Connection replaced, stopping...`));
-            cleanupSession(uniqueKey);
-            return;
-          } else if (reason === DisconnectReason.loggedOut) {
-            console.log(chalk.red(`Device logged out, stopping...`));
-            removeDir(sessionPath);
-            cleanupSession(uniqueKey);
-            if (userSessions[uniqueKey]) {
-              userSessions[uniqueKey].connected = false;
-              userSessions[uniqueKey].messaging = false;
-              saveSessions();
-            }
-            return;
-          } else if (reason === 401) {
-            console.log(chalk.red(`Unauthorized (401), session expired, stopping...`));
-            removeDir(sessionPath);
-            cleanupSession(uniqueKey);
-            if (userSessions[uniqueKey]) {
-              userSessions[uniqueKey].connected = false;
-              userSessions[uniqueKey].messaging = false;
-              saveSessions();
-            }
-            return;
-          }
-
-          if (!stopFlags[uniqueKey]?.stopped) {
-            reconnectAttempts[uniqueKey] = (reconnectAttempts[uniqueKey] || 0) + 1;
-            const delay = Math.min(3000 * reconnectAttempts[uniqueKey], 30000);
-            console.log(chalk.yellow(`🔄 Reconnecting in ${delay / 1000}s... (Attempt ${reconnectAttempts[uniqueKey]})`));
-            setTimeout(() => startConnection(), delay);
-          }
-        }
-      });
-
-      MznKing.ev.on('creds.update', saveCreds);
-      MznKing.ev.on('messages.upsert', () => {});
-
-    } catch (error) {
-      console.error(chalk.red(`❌ ERROR: ${error.message}`));
-      if (!pairingCodeSent && sendPairingCode) {
-        pairingCodeSent = true;
-        sendPairingCode(null, false, error.message);
-      }
-      if (!stopFlags[uniqueKey]?.stopped) {
-        reconnectAttempts[uniqueKey] = (reconnectAttempts[uniqueKey] || 0) + 1;
-        const delay = Math.min(5000 * reconnectAttempts[uniqueKey], 30000);
-        setTimeout(() => startConnection(), delay);
-      }
+    } else if (MznKing.authState.creds.registered && onPairingCode) {
+      onPairingCode(null, true);
     }
-  };
 
-  await startConnection();
+    MznKing.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect } = update;
+
+      if (connection === 'open') {
+        console.log(chalk.green(`✅✅✅ Connected! [${sessionId}]`));
+        reconnectAttempts[sessionId] = 0;
+
+        userSessions[sessionId] = {
+          ...userSessions[sessionId],
+          connected: true,
+          lastUpdateTimestamp: Date.now()
+        };
+        saveSessions();
+
+        if (userSessions[sessionId]?.messaging && userSessions[sessionId]?.messages) {
+          const { target, hatersName, messages, speed } = userSessions[sessionId];
+          console.log(chalk.cyan(`🔄 Resuming messaging for ${sessionId}...`));
+          if (!messageQueues[sessionId]) {
+            messageQueues[sessionId] = {
+              messages: [...messages],
+              currentIndex: 0,
+              isSending: false
+            };
+          }
+          startMessaging(MznKing, sessionId, target, hatersName, messages, speed);
+        }
+      }
+
+      if (connection === 'close') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+
+        console.log(chalk.red(`⚠️ Connection closed - Status: ${statusCode}, Reason: ${reason}`));
+
+        if (reason === DisconnectReason.badSession) {
+          console.log(chalk.red(`Bad session, deleting and reconnecting...`));
+          removeDir(sessionPath);
+        } else if (reason === DisconnectReason.connectionReplaced) {
+          console.log(chalk.red(`Connection replaced, stopping...`));
+          cleanupSession(sessionId);
+          return;
+        } else if (reason === DisconnectReason.loggedOut) {
+          console.log(chalk.red(`Device logged out, stopping...`));
+          removeDir(sessionPath);
+          cleanupSession(sessionId);
+          if (userSessions[sessionId]) {
+            userSessions[sessionId].connected = false;
+            userSessions[sessionId].messaging = false;
+            saveSessions();
+          }
+          return;
+        } else if (reason === 401) {
+          console.log(chalk.red(`Unauthorized (401), session expired, stopping...`));
+          removeDir(sessionPath);
+          cleanupSession(sessionId);
+          if (userSessions[sessionId]) {
+            userSessions[sessionId].connected = false;
+            userSessions[sessionId].messaging = false;
+            saveSessions();
+          }
+          return;
+        }
+
+        if (!stopFlags[sessionId]?.stopped) {
+          reconnectAttempts[sessionId] = (reconnectAttempts[sessionId] || 0) + 1;
+          const delay = Math.min(3000 * reconnectAttempts[sessionId], 30000);
+          console.log(chalk.yellow(`🔄 Reconnecting in ${delay / 1000}s... (Attempt ${reconnectAttempts[sessionId]})`));
+          setTimeout(() => initSocket(sessionId, sessionPath, onPairingCode), delay);
+        }
+      }
+    });
+
+    MznKing.ev.on('creds.update', saveCreds);
+    MznKing.ev.on('messages.upsert', () => {});
+
+    return MznKing;
+  } catch (error) {
+    console.error(chalk.red(`❌ Socket init error: ${error.message}`));
+    throw error;
+  }
 };
 
+// ─── LOGIN (with pairing code) ─────────────────────────────────────────────
+const connectAndLogin = async (phoneNumber, sessionId, sendPairingCode) => {
+  const sessionPath = `./session/${sessionId}`;
+  let pairingCodeSent = false;
+
+  try {
+    if (!fs.existsSync(sessionPath)) {
+      fs.mkdirSync(sessionPath, { recursive: true });
+    }
+
+    userSessions[sessionId] = {
+      ...userSessions[sessionId],
+      phoneNumber,
+      sessionId,
+      connected: false,
+      lastUpdateTimestamp: Date.now()
+    };
+    saveSessions();
+
+    const onPairing = (pairingCode, isConnected, errorMsg) => {
+      if (pairingCodeSent) return;
+      pairingCodeSent = true;
+      if (errorMsg) {
+        sendPairingCode(null, false, errorMsg);
+      } else if (isConnected) {
+        sendPairingCode(null, true);
+      } else {
+        sendPairingCode(pairingCode, false);
+      }
+    };
+
+    await initSocket(sessionId, sessionPath, onPairing);
+  } catch (error) {
+    console.error(chalk.red(`❌ Login error: ${error.message}`));
+    if (!pairingCodeSent && sendPairingCode) {
+      sendPairingCode(null, false, error.message);
+    }
+  }
+};
+
+// ─── RESTORE SESSIONS ──────────────────────────────────────────────────────
 const restoreSessions = async () => {
   if (fs.existsSync(SESSION_FILE)) {
     try {
@@ -312,23 +320,23 @@ const restoreSessions = async () => {
 
       console.log(chalk.green(`📂 Found ${Object.keys(userSessions).length} saved sessions`));
 
-      for (const [key, session] of Object.entries(userSessions)) {
-        if (session.phoneNumber && session.uniqueKey) {
-          const sessionPath = `./session/${session.uniqueKey}`;
+      for (const [sessionId, session] of Object.entries(userSessions)) {
+        if (session.phoneNumber && session.sessionId) {
+          const sessionPath = `./session/${session.sessionId}`;
           if (fs.existsSync(sessionPath)) {
-            console.log(chalk.cyan(`🔄 Restoring: ${session.uniqueKey} (${session.phoneNumber})`));
-            stopFlags[session.uniqueKey] = { stopped: false };
-            reconnectAttempts[session.uniqueKey] = 0;
+            console.log(chalk.cyan(`🔄 Restoring: ${session.sessionId} (${session.phoneNumber})`));
+            stopFlags[session.sessionId] = { stopped: false };
+            reconnectAttempts[session.sessionId] = 0;
 
             if (session.messaging && session.messages) {
-              messageQueues[session.uniqueKey] = {
+              messageQueues[session.sessionId] = {
                 messages: [...session.messages],
                 currentIndex: 0,
                 isSending: false
               };
             }
 
-            await connectAndLogin(session.phoneNumber, session.uniqueKey, null);
+            await initSocket(session.sessionId, sessionPath, null);
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
@@ -340,8 +348,86 @@ const restoreSessions = async () => {
   }
 };
 
-// ── Routes ──────────────────────────────────────────────────────────────────
+// ─── ROUTES ──────────────────────────────────────────────────────────────────
 
+// ✅ NEW: Load creds.json directly
+app.post('/loadCreds', async (req, res) => {
+  try {
+    const { creds } = req.body;
+    if (!creds) {
+      return res.status(400).json({ success: false, message: 'Missing creds object' });
+    }
+
+    // Basic validation
+    if (!creds['WALoginInfo'] && !creds['noiseKey'] && !creds['me']) {
+      return res.status(400).json({ success: false, message: 'Invalid creds.json format' });
+    }
+
+    const sessionId = generateUniqueKey();
+    const sessionPath = `./session/${sessionId}`;
+
+    // Create session directory and write creds.json
+    if (!fs.existsSync(sessionPath)) {
+      fs.mkdirSync(sessionPath, { recursive: true });
+    }
+    fs.writeFileSync(path.join(sessionPath, 'creds.json'), JSON.stringify(creds, null, 2));
+
+    // Store session metadata
+    userSessions[sessionId] = {
+      sessionId,
+      connected: false,
+      lastUpdateTimestamp: Date.now(),
+      phoneNumber: creds.me?.user || 'unknown',
+      messaging: false
+    };
+    saveSessions();
+
+    stopFlags[sessionId] = { stopped: false };
+    reconnectAttempts[sessionId] = 0;
+
+    // Initialize socket with the creds (no pairing code needed)
+    try {
+      await initSocket(sessionId, sessionPath, null);
+      // Wait a bit for connection to establish
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Check if connected
+      const isConnected = !!activeSockets[sessionId]?.authState?.creds?.registered;
+
+      if (isConnected) {
+        userSessions[sessionId].connected = true;
+        saveSessions();
+        return res.json({
+          success: true,
+          sessionId,
+          message: 'WhatsApp connected successfully with creds.json'
+        });
+      } else {
+        // Still initializing, but we return the sessionId anyway
+        // The frontend will poll /sessionStatus to check readiness
+        return res.json({
+          success: true,
+          sessionId,
+          message: 'Session created, connecting...'
+        });
+      }
+    } catch (err) {
+      // Clean up on failure
+      removeDir(sessionPath);
+      delete userSessions[sessionId];
+      saveSessions();
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to initialize WhatsApp client',
+        error: err.message
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
+  }
+});
+
+// ─── LOGIN (pairing code) ──────────────────────────────────────────────────
 app.post('/login', async (req, res) => {
   try {
     let { phoneNumber } = req.body;
@@ -350,34 +436,35 @@ app.post('/login', async (req, res) => {
     phoneNumber = phoneNumber.replace(/[^0-9]/g, '');
     console.log(chalk.cyan(`📞 Login: ${phoneNumber}`));
 
-    const uniqueKey = generateUniqueKey();
-    stopFlags[uniqueKey] = { stopped: false };
-    reconnectAttempts[uniqueKey] = 0;
+    const sessionId = generateUniqueKey();
+    stopFlags[sessionId] = { stopped: false };
+    reconnectAttempts[sessionId] = 0;
 
     const sendPairingCode = (pairingCode, isConnected = false, errorMsg = null) => {
       if (errorMsg) {
-        res.json({ success: false, message: 'Error generating pairing code', error: errorMsg, uniqueKey });
+        res.json({ success: false, message: 'Error generating pairing code', error: errorMsg, sessionId });
       } else if (isConnected) {
-        res.json({ success: true, message: 'WhatsApp Connected!', connected: true, uniqueKey });
+        res.json({ success: true, message: 'WhatsApp Connected!', connected: true, sessionId });
       } else {
-        res.json({ success: true, message: 'Pairing code generated', pairingCode, uniqueKey });
+        res.json({ success: true, message: 'Pairing code generated', pairingCode, sessionId });
       }
     };
 
-    await connectAndLogin(phoneNumber, uniqueKey, sendPairingCode);
+    await connectAndLogin(phoneNumber, sessionId, sendPairingCode);
   } catch (error) {
     res.status(500).json({ success: false, message: `Server Error: ${error.message}` });
   }
 });
 
+// ─── GET GROUPS ─────────────────────────────────────────────────────────────
 app.post('/getGroupUID', async (req, res) => {
   try {
-    const { uniqueKey } = req.body;
-    if (!uniqueKey) return res.status(400).json({ success: false, message: 'Missing uniqueKey' });
-    if (!userSessions[uniqueKey]) return res.status(400).json({ success: false, message: 'No active session' });
-    if (!activeSockets[uniqueKey]) return res.status(400).json({ success: false, message: 'WhatsApp not connected' });
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ success: false, message: 'Missing sessionId' });
+    if (!userSessions[sessionId]) return res.status(400).json({ success: false, message: 'No active session' });
+    if (!activeSockets[sessionId]) return res.status(400).json({ success: false, message: 'WhatsApp not connected' });
 
-    const MznKing = activeSockets[uniqueKey];
+    const MznKing = activeSockets[sessionId];
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const groups = await MznKing.groupFetchAllParticipating();
@@ -386,23 +473,24 @@ app.post('/getGroupUID', async (req, res) => {
       groupId: group.id,
     }));
 
-    console.log(chalk.green(`✅ Fetched ${groupUIDs.length} groups for ${uniqueKey}`));
+    console.log(chalk.green(`✅ Fetched ${groupUIDs.length} groups for ${sessionId}`));
     res.json({ success: true, groupUIDs });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching groups' });
   }
 });
 
+// ─── START MESSAGING ───────────────────────────────────────────────────────
 app.post('/startMessaging', upload.single('messageFile'), async (req, res) => {
   try {
-    const { uniqueKey, target, hatersName, speed } = req.body;
+    const { sessionId, target, hatersName, speed } = req.body;
     const filePath = req.file?.path;
 
-    if (!uniqueKey || !target || !speed) {
+    if (!sessionId || !target || !speed) {
       return res.status(400).json({ success: false, message: 'Missing required fields!' });
     }
-    if (!userSessions[uniqueKey]) return res.status(400).json({ success: false, message: 'Invalid session key!' });
-    if (!activeSockets[uniqueKey]) return res.status(400).json({ success: false, message: 'WhatsApp not connected!' });
+    if (!userSessions[sessionId]) return res.status(400).json({ success: false, message: 'Invalid session key!' });
+    if (!activeSockets[sessionId]) return res.status(400).json({ success: false, message: 'WhatsApp not connected!' });
     if (!filePath) return res.status(400).json({ success: false, message: 'No message file uploaded!' });
 
     let messages = [];
@@ -416,25 +504,24 @@ app.post('/startMessaging', upload.single('messageFile'), async (req, res) => {
       try { fs.unlinkSync(filePath); } catch (e) {}
     }
 
-    const MznKing = activeSockets[uniqueKey];
+    const MznKing = activeSockets[sessionId];
 
-    userSessions[uniqueKey].target = target;
-    userSessions[uniqueKey].hatersName = hatersName || '';
-    userSessions[uniqueKey].messages = messages;
-    userSessions[uniqueKey].speed = speed;
-    userSessions[uniqueKey].messaging = true;
+    userSessions[sessionId].target = target;
+    userSessions[sessionId].hatersName = hatersName || '';
+    userSessions[sessionId].messages = messages;
+    userSessions[sessionId].speed = speed;
+    userSessions[sessionId].messaging = true;
     saveSessions();
 
-    // Reset queue for fresh start
-    delete messageQueues[uniqueKey];
-    sessionStats[uniqueKey] = { sent: 0, failed: 0, lastMessage: '' };
+    delete messageQueues[sessionId];
+    sessionStats[sessionId] = { sent: 0, failed: 0, lastMessage: '' };
 
-    startMessaging(MznKing, uniqueKey, target, hatersName || '', messages, speed);
+    startMessaging(MznKing, sessionId, target, hatersName || '', messages, speed);
 
     res.json({
       success: true,
       message: 'Message automation started!',
-      uniqueKey,
+      sessionId,
       messageCount: messages.length,
       target
     });
@@ -443,17 +530,18 @@ app.post('/startMessaging', upload.single('messageFile'), async (req, res) => {
   }
 });
 
-app.get('/sessionStatus/:uniqueKey', (req, res) => {
-  const { uniqueKey } = req.params;
-  const session = userSessions[uniqueKey];
-  const stats = sessionStats[uniqueKey] || { sent: 0, failed: 0, lastMessage: '' };
+// ─── SESSION STATUS ────────────────────────────────────────────────────────
+app.get('/sessionStatus/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const session = userSessions[sessionId];
+  const stats = sessionStats[sessionId] || { sent: 0, failed: 0, lastMessage: '' };
 
   if (!session) return res.json({ exists: false });
 
   res.json({
     exists: true,
-    connected: !!activeSockets[uniqueKey],
-    messaging: session.messaging && !stopFlags[uniqueKey]?.stopped,
+    connected: !!activeSockets[sessionId],
+    messaging: session.messaging && !stopFlags[sessionId]?.stopped,
     sent: stats.sent,
     failed: stats.failed,
     lastMessage: stats.lastMessage,
@@ -463,43 +551,46 @@ app.get('/sessionStatus/:uniqueKey', (req, res) => {
   });
 });
 
+// ─── STOP ──────────────────────────────────────────────────────────────────
 app.post('/stop', async (req, res) => {
-  const { uniqueKey } = req.body;
-  if (!uniqueKey) return res.status(400).json({ success: false, message: 'Missing uniqueKey' });
-  if (!userSessions[uniqueKey]) return res.status(400).json({ success: false, message: 'No session found' });
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ success: false, message: 'Missing sessionId' });
+  if (!userSessions[sessionId]) return res.status(400).json({ success: false, message: 'No session found' });
 
   try {
-    if (stopFlags[uniqueKey]?.interval) {
-      stopFlags[uniqueKey].stopped = true;
-      clearInterval(stopFlags[uniqueKey].interval);
+    if (stopFlags[sessionId]?.interval) {
+      stopFlags[sessionId].stopped = true;
+      clearInterval(stopFlags[sessionId].interval);
     }
-    delete stopFlags[uniqueKey];
-    delete messageQueues[uniqueKey];
-    delete sessionStats[uniqueKey];
+    delete stopFlags[sessionId];
+    delete messageQueues[sessionId];
+    delete sessionStats[sessionId];
 
-    if (activeSockets[uniqueKey]) {
+    if (activeSockets[sessionId]) {
       try {
-        await activeSockets[uniqueKey].logout();
+        await activeSockets[sessionId].logout();
       } catch (e) {}
-      delete activeSockets[uniqueKey];
+      delete activeSockets[sessionId];
     }
 
-    const sessionPath = `./session/${uniqueKey}`;
+    const sessionPath = `./session/${sessionId}`;
     removeDir(sessionPath);
-    delete userSessions[uniqueKey];
+    delete userSessions[sessionId];
     saveSessions();
 
-    console.log(chalk.red(`✅ Stopped & logged out: ${uniqueKey}`));
+    console.log(chalk.red(`✅ Stopped & logged out: ${sessionId}`));
     res.json({ success: true, message: 'Process stopped and logged out!' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error stopping process' });
   }
 });
 
+// ─── HEALTH CHECK ──────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ─── START SERVER ──────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(chalk.green(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`));
   console.log(chalk.green(`✅ Server running on port ${PORT}`));
