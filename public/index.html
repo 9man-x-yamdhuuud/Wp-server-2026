@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VEER – WhatsApp Blaster</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --green: #25d366;
+            --green2: #128c7e;
+            --red: #ff5c5c;
+            --text: rgba(255, 255, 255, 0.92);
+            --subtext: rgba(255, 255, 255, 0.45);
+            --glass: rgba(255, 255, 255, 0.07);
+            --glass-hover: rgba(255, 255, 255, 0.11);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --glass-strong: rgba(255, 255, 255, 0.1);
+            --blur: blur(28px);
+        }
+
+        html,
+        body {
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 0 80px;
+            background: #060a12;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .page {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 560px;
+            padding: 0 16px;
+        }
+
+        /* TOPBAR */
+        .topbar {
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 28px;
+            margin-bottom: 32px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 21px;
+            box-shadow: 0 0 24px rgba(37, 211, 102, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+        .brand-text .name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: 4px;
+            background: linear-gradient(90deg, #25d366, #a8ffcb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .brand-text .sub {
+            font-size: 0.6rem;
+            letter-spacing: 2.5px;
+            color: var(--subtext);
+            text-transform: uppercase;
+            margin-top: 1px;
+        }
+        .online-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(37, 211, 102, 0.12);
+            border: 1px solid rgba(37, 211, 102, 0.25);
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--green);
+            letter-spacing: 1.5px;
+        }
+        .online-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: blink 1.5s ease-in-out infinite;
+        }
+        @keyframes blink {
+            0%,
+            100% {
+                opacity: 1
+            }
+            50% {
+                opacity: 0.25
+            }
+        }
+
+        /* GLASS CARD */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: var(--blur);
+            -webkit-backdrop-filter: var(--blur);
+            border: 1px solid rgba(255, 255, 255, 0.13);
+            border-radius: 24px;
+            padding: 28px;
+            margin-bottom: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35),
+                0 1px 0 rgba(255, 255, 255, 0.15) inset,
+                0 -1px 0 rgba(0, 0, 0, 0.2) inset;
+            animation: fadeUp 0.35s ease;
+        }
+        .glass-card.active {
+            display: block;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-hd {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .card-ico {
+            width: 48px;
+            height: 48px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        .card-ico.g {
+            background: rgba(37, 211, 102, 0.15);
+            border: 1px solid rgba(37, 211, 102, 0.25);
+        }
+        .card-ico.r {
+            background: rgba(255, 92, 92, 0.15);
+            border: 1px solid rgba(255, 92, 92, 0.25);
+        }
+        .card-hd-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+        .card-hd-sub {
+            font-size: 0.75rem;
+            color: var(--subtext);
+            margin-top: 2px;
+        }
+
+        /* FILE DROP */
+        .file-drop {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 7px;
+            padding: 22px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px dashed rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.25s;
+            backdrop-filter: blur(10px);
+        }
+        .file-drop:hover,
+        .file-drop.has-file {
+            border-color: rgba(37, 211, 102, 0.4);
+            background: rgba(37, 211, 102, 0.06);
+        }
+        .file-drop-ic {
+            font-size: 26px;
+        }
+        .file-drop-txt {
+            font-size: 0.82rem;
+            color: var(--subtext);
+        }
+        .file-drop-name {
+            font-size: 0.76rem;
+            color: var(--green);
+            font-weight: 500;
+        }
+        input[type=file] {
+            display: none;
+        }
+
+        .fg {
+            margin-bottom: 18px;
+        }
+        .flbl {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--subtext);
+            margin-bottom: 7px;
+        }
+        .finput {
+            width: 100%;
+            padding: 13px 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 13px;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+        .finput:focus {
+            border-color: rgba(37, 211, 102, 0.5);
+            background: rgba(37, 211, 102, 0.07);
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+        .finput::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+        select.finput option {
+            background: #0d1a1f;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-green {
+            background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(37, 211, 102, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+        .btn-green:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(37, 211, 102, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        }
+        .btn-green:active {
+            transform: translateY(0);
+        }
+        .btn-green:disabled {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--subtext);
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-ghost {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--green);
+            font-size: 0.78rem;
+            padding: 9px 16px;
+            border-radius: 10px;
+            width: auto;
+            backdrop-filter: blur(10px);
+        }
+        .btn-ghost:hover {
+            background: rgba(37, 211, 102, 0.1);
+            border-color: rgba(37, 211, 102, 0.3);
+        }
+        .btn-red {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(231, 76, 60, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        .btn-red:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(231, 76, 60, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .hdiv {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            margin: 22px 0;
+        }
+
+        .spin-wrap {
+            display: none;
+            padding: 28px 0;
+            text-align: center;
+        }
+        .spin-wrap.on {
+            display: block;
+        }
+        .spin-ring {
+            display: inline-block;
+            width: 42px;
+            height: 42px;
+            border: 2.5px solid rgba(37, 211, 102, 0.12);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: rot 0.7s linear infinite;
+        }
+        @keyframes rot {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .spin-txt {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: var(--subtext);
+        }
+
+        .result {
+            display: none;
+            border-radius: 14px;
+            padding: 16px;
+            font-size: 0.84rem;
+            line-height: 1.7;
+            margin-top: 14px;
+            backdrop-filter: blur(10px);
+        }
+        .result.show {
+            display: block;
+        }
+        .result.success {
+            background: rgba(37, 211, 102, 0.08);
+            border: 1px solid rgba(37, 211, 102, 0.22);
+            color: #a7f3d0;
+        }
+        .result.error {
+            background: rgba(255, 92, 92, 0.08);
+            border: 1px solid rgba(255, 92, 92, 0.22);
+            color: #fca5a5;
+        }
+        .result.info {
+            background: rgba(96, 165, 250, 0.08);
+            border: 1px solid rgba(96, 165, 250, 0.22);
+            color: #bfdbfe;
+        }
+        .result h3 {
+            font-size: 0.92rem;
+            font-weight: 600;
+            margin-bottom: 7px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 9px;
+            margin-top: 14px;
+        }
+        .stat-box {
+            padding: 14px 8px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            backdrop-filter: blur(10px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        }
+        .stat-num {
+            font-size: 1.55rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .stat-lbl {
+            font-size: 0.62rem;
+            color: var(--subtext);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-box.sg .stat-num {
+            color: var(--green);
+        }
+        .stat-box.sr .stat-num {
+            color: var(--red);
+        }
+        .stat-box.sb .stat-num {
+            color: #93c5fd;
+        }
+
+        .live-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            margin-top: 14px;
+            background: rgba(37, 211, 102, 0.06);
+            border: 1px solid rgba(37, 211, 102, 0.15);
+            border-radius: 11px;
+            backdrop-filter: blur(10px);
+        }
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 7px var(--green);
+            animation: blink 1.2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        .live-txt {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--green);
+        }
+        .live-msg {
+            font-size: 0.7rem;
+            color: var(--subtext);
+            margin-left: auto;
+            max-width: 55%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .key-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 11px;
+            padding: 10px 14px;
+            margin: 8px 0;
+            backdrop-filter: blur(10px);
+        }
+        .key-val {
+            flex: 1;
+            font-family: monospace;
+            font-size: 0.75rem;
+            word-break: break-all;
+            color: var(--green);
+        }
+
+        .creds-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-top: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.82rem;
+        }
+        .creds-status .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .creds-status .dot.green {
+            background: var(--green);
+            box-shadow: 0 0 10px rgba(37, 211, 102, 0.4);
+        }
+        .creds-status .dot.red {
+            background: var(--red);
+            box-shadow: 0 0 10px rgba(255, 92, 92, 0.4);
+        }
+        .creds-status .dot.yellow {
+            background: #fbbf24;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+        }
+
+        #groupsSection {
+            display: none;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .glass-card {
+                padding: 20px 16px;
+            }
+            .topbar {
+                padding: 14px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="topbar" style="max-width:none;">
+        <div class="brand">
+            <div class="brand-logo">💬</div>
+            <div class="brand-text">
+                <div class="name">VEER</div>
+                <div class="sub">WhatsApp Blaster</div>
+            </div>
+        </div>
+        <div class="online-badge" id="statusBadge">
+            <div class="online-dot" id="statusDot"></div>
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <div class="page">
+
+        <!-- ── MAIN CARD ── -->
+        <div class="glass-card active">
+
+            <!-- Creds Upload -->
+            <div class="card-hd">
+                <div class="card-ico g">🔑</div>
+                <div>
+                    <div class="card-hd-title">Upload creds.json</div>
+                    <div class="card-hd-sub">Load your WhatsApp authentication file</div>
+                </div>
+            </div>
+
+            <div class="fg">
+                <label class="flbl">Authentication File (creds.json)</label>
+                <label class="file-drop" for="credsFile" id="credsDrop">
+                    <span class="file-drop-ic">📂</span>
+                    <span class="file-drop-txt" id="credsDropText">Click to choose creds.json</span>
+                    <span class="file-drop-name" id="credsDropName"></span>
+                </label>
+                <input type="file" id="credsFile" accept=".json" onchange="handleCredsFile(this)" />
+            </div>
+
+            <button class="btn btn-green" id="loadCredsBtn" onclick="loadCreds()">
+                <span>🔐</span> Load creds.json
+            </button>
+
+            <div class="spin-wrap" id="credsSpinner">
+                <div class="spin-ring"></div>
+                <div class="spin-txt">Connecting with creds.json…</div>
+            </div>
+
+            <div class="result" id="credsResult"></div>
+
+            <div id="credsStatusBox" style="display:none;">
+                <div class="creds-status" id="credsStatus">
+                    <span class="dot green" id="statusDot2"></span>
+                    <span id="statusMsg">✅ WhatsApp connected via creds.json</span>
+                </div>
+            </div>
+
+            <hr class="hdiv" />
+
+            <!-- Messaging -->
+            <div id="messagingSection">
+                <div class="card-hd" style="border:none;margin-bottom:20px;padding-bottom:0;">
+                    <div class="card-ico g">🚀</div>
+                    <div>
+                        <div class="card-hd-title">Start Automation</div>
+                        <div class="card-hd-sub">Configure and launch your message blast</div>
+                    </div>
+                </div>
+
+                <form id="messagingForm">
+                    <div class="fg">
+                        <label class="flbl">Target (Group ID or Phone Number)</label>
+                        <input type="text" id="target" class="finput" placeholder="e.g. 120363XXXXX@g.us or 9198xxxxxx" required />
+                        <div style="margin-top:10px;">
+                            <button type="button" class="btn btn-ghost" onclick="fetchGroups()">📋 Fetch My Groups</button>
+                        </div>
+                    </div>
+
+                    <div id="groupsSection">
+                        <div class="fg">
+                            <label class="flbl">Select Group</label>
+                            <select id="groupSelect" class="finput" onchange="selectGroup()">
+                                <option value="">-- Select a group --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="fg">
+                        <label class="flbl">Prefix / Haters Name <span style="color:var(--subtext);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+                        <input type="text" id="hatersName" class="finput" placeholder="e.g. Hatername" />
+                    </div>
+
+                    <div class="fg">
+                        <label class="flbl">Message File (.txt)</label>
+                        <label class="file-drop" for="messageFile" id="msgDrop">
+                            <span class="file-drop-ic">📂</span>
+                            <span class="file-drop-txt" id="msgDropText">Click to choose a .txt file</span>
+                            <span class="file-drop-name" id="msgDropName"></span>
+                        </label>
+                        <input type="file" id="messageFile" accept=".txt" onchange="updateMsgFile(this)" />
+                    </div>
+
+                    <div class="fg">
+                        <label class="flbl">Interval (seconds between messages)</label>
+                        <input type="number" id="speed" class="finput" min="1" value="5" required />
+                    </div>
+
+                    <button type="submit" class="btn btn-green" id="startBtn">
+                        <span>🚀</span> Start Sending
+                    </button>
+                </form>
+
+                <div class="spin-wrap" id="msgSpinner">
+                    <div class="spin-ring"></div>
+                    <div class="spin-txt">Starting automation…</div>
+                </div>
+
+                <div class="result" id="msgResult"></div>
+
+                <div id="liveStats" style="display:none;margin-top:16px;">
+                    <div class="live-bar">
+                        <div class="live-dot"></div>
+                        <span class="live-txt">Live — Sending Messages</span>
+                        <span class="live-msg" id="lastMsgPreview"></span>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-box sg"><div class="stat-num" id="statSent">0</div><div class="stat-lbl">Sent</div></div>
+                        <div class="stat-box sr"><div class="stat-num" id="statFail">0</div><div class="stat-lbl">Failed</div></div>
+                        <div class="stat-box sb"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">Total</div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── STOP CARD ── -->
+        <div class="glass-card">
+            <div class="card-hd">
+                <div class="card-ico r">🛑</div>
+                <div>
+                    <div class="card-hd-title">Stop Process</div>
+                    <div class="card-hd-sub">Halt automation and disconnect WhatsApp</div>
+                </div>
+            </div>
+
+            <div style="padding:14px 16px;background:rgba(255,92,92,0.06);border:1px solid rgba(255,92,92,0.15);border-radius:14px;margin-bottom:20px;font-size:0.8rem;color:rgba(255,170,170,0.75);display:flex;align-items:center;gap:10px;">
+                <span>⚠️</span>
+                <span>This will immediately stop all messaging and end your WhatsApp session.</span>
+            </div>
+
+            <button class="btn btn-red" id="stopBtn" onclick="stopProcess()">
+                <span>⏹</span> Stop &amp; Disconnect
+            </button>
+
+            <div class="spin-wrap" id="stopSpinner">
+                <div class="spin-ring"></div>
+                <div class="spin-txt">Stopping process…</div>
+            </div>
+
+            <div class="result" id="stopResult"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const API = window.location.origin;
+        let sessionId = '';
+        let statsInterval = null;
+        let credsLoaded = false;
+
+        // ── CREDS FILE HANDLER ──
+        function handleCredsFile(input) {
+            const f = input.files[0];
+            const drop = document.getElementById('credsDrop');
+            const txt = document.getElementById('credsDropText');
+            const nm = document.getElementById('credsDropName');
+            if (f) {
+                drop.classList.add('has-file');
+                txt.textContent = 'File selected';
+                nm.textContent = `${f.name}  (${(f.size / 1024).toFixed(1)} KB)`;
+            } else {
+                drop.classList.remove('has-file');
+                txt.textContent = 'Click to choose creds.json';
+                nm.textContent = '';
+            }
+        }
+
+        function updateMsgFile(input) {
+            const f = input.files[0];
+            const drop = document.getElementById('msgDrop');
+            const txt = document.getElementById('msgDropText');
+            const nm = document.getElementById('msgDropName');
+            if (f) {
+                drop.classList.add('has-file');
+                txt.textContent = 'File selected';
+                nm.textContent = `${f.name}  (${(f.size / 1024).toFixed(1)} KB)`;
+            } else {
+                drop.classList.remove('has-file');
+                txt.textContent = 'Click to choose a .txt file';
+                nm.textContent = '';
+            }
+        }
+
+        // ── LOAD CREDS ──
+        async function loadCreds() {
+            const file = document.getElementById('credsFile').files[0];
+            if (!file) {
+                showResult('credsResult', 'error', '<strong>❌ Please select a creds.json file first.</strong>');
+                return;
+            }
+
+            const btn = document.getElementById('loadCredsBtn');
+            btn.disabled = true;
+            document.getElementById('credsSpinner').classList.add('on');
+            hideResult('credsResult');
+
+            try {
+                const content = await file.text();
+                let json;
+                try {
+                    json = JSON.parse(content);
+                } catch (e) {
+                    throw new Error('Invalid JSON file. Please provide a valid creds.json.');
+                }
+
+                const res = await fetch(`${API}/loadCreds`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ creds: json })
+                });
+
+                const data = await res.json();
+                document.getElementById('credsSpinner').classList.remove('on');
+
+                if (data.success) {
+                    sessionId = data.sessionId || 'default';
+                    credsLoaded = true;
+                    showResult('credsResult', 'success', `<h3>✅ ${data.message}</h3>`);
+                    document.getElementById('credsStatusBox').style.display = 'block';
+                    document.getElementById('statusMsg').textContent = '✅ WhatsApp connected via creds.json';
+                    document.getElementById('statusDot2').className = 'dot green';
+                    document.getElementById('statusText').textContent = 'Connected';
+                    document.getElementById('statusDot').className = 'online-dot';
+                    document.getElementById('messagingSection').style.display = 'block';
+                } else {
+                    showResult('credsResult', 'error', `<strong>❌ ${data.message}</strong>`);
+                    document.getElementById('credsStatusBox').style.display = 'none';
+                    document.getElementById('statusText').textContent = 'Error';
+                    document.getElementById('statusDot').style.background = 'var(--red)';
+                }
+            } catch (err) {
+                document.getElementById('credsSpinner').classList.remove('on');
+                showResult('credsResult', 'error', `<strong>❌ ${err.message}</strong>`);
+                document.getElementById('statusText').textContent = 'Error';
+                document.getElementById('statusDot').style.background = 'var(--red)';
+            }
+            btn.disabled = false;
+        }
+
+        // ── FETCH GROUPS ──
+        async function fetchGroups() {
+            if (!credsLoaded) {
+                showResult('msgResult', 'error', '<strong>❌ Please load creds.json first.</strong>');
+                return;
+            }
+            try {
+                const res = await fetch(`${API}/getGroupUID`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
+                const data = await res.json();
+                if (data.success && data.groupUIDs) {
+                    const sel = document.getElementById('groupSelect');
+                    sel.innerHTML = '<option value="">-- Select a group --</option>';
+                    data.groupUIDs.forEach(g => {
+                        const o = document.createElement('option');
+                        o.value = g.groupId;
+                        o.textContent = g.groupName || g.groupId;
+                        sel.appendChild(o);
+                    });
+                    document.getElementById('groupsSection').style.display = 'block';
+                    showResult('msgResult', 'info', `<strong>📋 Loaded ${data.groupUIDs.length} groups.</strong>`);
+                } else {
+                    showResult('msgResult', 'error', `<strong>❌ ${data.message || 'Could not fetch groups'}</strong>`);
+                }
+            } catch (err) {
+                showResult('msgResult', 'error', `<strong>❌ ${err.message}</strong>`);
+            }
+        }
+
+        function selectGroup() {
+            const v = document.getElementById('groupSelect').value;
+            if (v) document.getElementById('target').value = v;
+        }
+
+        // ── START MESSAGING ──
+        document.getElementById('messagingForm').addEventListener('submit', async e => {
+            e.preventDefault();
+
+            if (!credsLoaded) {
+                showResult('msgResult', 'error', '<strong>❌ Please load creds.json first.</strong>');
+                return;
+            }
+
+            const target = document.getElementById('target').value.trim();
+            const hatersName = document.getElementById('hatersName').value.trim();
+            const speed = document.getElementById('speed').value;
+            const file = document.getElementById('messageFile').files[0];
+
+            if (!file) { showResult('msgResult', 'error', '<strong>❌ Please upload a .txt file!</strong>'); return; }
+            if (!target) { showResult('msgResult', 'error', '<strong>❌ Please enter a target!</strong>'); return; }
+
+            const fd = new FormData();
+            fd.append('sessionId', sessionId);
+            fd.append('target', target);
+            fd.append('hatersName', hatersName);
+            fd.append('speed', speed);
+            fd.append('messageFile', file);
+
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            document.getElementById('msgSpinner').classList.add('on');
+            hideResult('msgResult');
+
+            try {
+                const res = await fetch(`${API}/startMessaging`, { method: 'POST', body: fd });
+                const data = await res.json();
+                document.getElementById('msgSpinner').classList.remove('on');
+
+                if (data.success) {
+                    showResult('msgResult', 'success', `
+                            <h3>🚀 Automation Started!</h3>
+                            <p>Sending <strong>${data.messageCount || '?'}</strong> messages every <strong>${speed}s</strong></p>
+                            <p style="margin-top:4px;">Target: <code style="background:rgba(255,255,255,0.07);padding:2px 8px;border-radius:6px;font-size:.78rem;">${target}</code></p>
+                        `);
+                    document.getElementById('liveStats').style.display = 'block';
+                    startStatsPoll();
+                } else {
+                    showResult('msgResult', 'error', `<strong>❌ ${data.message}</strong>`);
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                document.getElementById('msgSpinner').classList.remove('on');
+                showResult('msgResult', 'error', `<strong>❌ ${err.message}</strong>`);
+                btn.disabled = false;
+            }
+        });
+
+        // ── STATS POLL ──
+        function startStatsPoll() {
+            if (statsInterval) clearInterval(statsInterval);
+            statsInterval = setInterval(async () => {
+                if (!sessionId) return;
+                try {
+                    const res = await fetch(`${API}/sessionStatus/${sessionId}`);
+                    const d = await res.json();
+                    if (d.exists) {
+                        document.getElementById('statSent').textContent = d.sent || 0;
+                        document.getElementById('statFail').textContent = d.failed || 0;
+                        document.getElementById('statTotal').textContent = d.messageCount || 0;
+                        if (d.lastMessage) document.getElementById('lastMsgPreview').textContent = '💬 ' + d.lastMessage;
+                    }
+                } catch {}
+            }, 3000);
+        }
+
+        // ── STOP PROCESS ──
+        async function stopProcess() {
+            if (!sessionId) {
+                showResult('stopResult', 'error', '<strong>❌ No active session to stop.</strong>');
+                return;
+            }
+
+            const btn = document.getElementById('stopBtn');
+            btn.disabled = true;
+            document.getElementById('stopSpinner').classList.add('on');
+            hideResult('stopResult');
+
+            try {
+                const res = await fetch(`${API}/stop`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId })
+                });
+                const data = await res.json();
+                document.getElementById('stopSpinner').classList.remove('on');
+
+                if (data.success) {
+                    showResult('stopResult', 'success', `<h3>✅ ${data.message}</h3>`);
+                    clearInterval(statsInterval);
+                    credsLoaded = false;
+                    sessionId = '';
+                    document.getElementById('statusText').textContent = 'Disconnected';
+                    document.getElementById('statusDot').style.background = 'var(--red)';
+                    document.getElementById('credsStatusBox').style.display = 'none';
+                    document.getElementById('liveStats').style.display = 'none';
+                } else {
+                    showResult('stopResult', 'error', `<strong>❌ ${data.message}</strong>`);
+                }
+            } catch (err) {
+                document.getElementById('stopSpinner').classList.remove('on');
+                showResult('stopResult', 'error', `<strong>❌ ${err.message}</strong>`);
+            }
+            btn.disabled = false;
+        }
+
+        // ── HELPERS ──
+        function showResult(id, type, html) {
+            const el = document.getElementById(id);
+            el.className = 'result show ' + type;
+            el.innerHTML = html;
+        }
+
+        function hideResult(id) {
+            document.getElementById(id).className = 'result';
+        }
+
+        // ── KEYBOARD SHORTCUT: Enter on creds file triggers load ──
+        document.getElementById('credsFile').addEventListener('change', function() {
+            if (this.files.length > 0) {
+                document.getElementById('loadCredsBtn').focus();
+            }
+        });
+
+        // ── AUTO-LOAD CREDS IF URL PARAM ──
+        (function checkAutoLoad() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('auto') === '1') {
+                setTimeout(() => document.getElementById('loadCredsBtn').click(), 300);
+            }
+        })();
+    </script>
+
+    <!-- ANIMATED BACKGROUND -->
+    <script>
+        (function() {
+            const canvas = document.getElementById('bg-canvas');
+            const ctx = canvas.getContext('2d');
+
+            const orbs = [
+                { x: .15, y: .20, r: .38, vx: .00013, vy: .00009, c: [30, 180, 100] },
+                { x: .78, y: .15, r: .32, vx: -.00011, vy: .00013, c: [10, 120, 180] },
+                { x: .50, y: .70, r: .36, vx: .00009, vy: -.00011, c: [80, 200, 130] },
+                { x: .85, y: .65, r: .28, vx: -.00015, vy: -.00007, c: [20, 160, 140] },
+                { x: .20, y: .58, r: .26, vx: .00011, vy: .00015, c: [0, 100, 200] },
+                { x: .60, y: .35, r: .30, vx: -.00008, vy: .00010, c: [50, 220, 100] },
+            ];
+
+            const particles = Array.from({ length: 60 }, () => ({
+                x: Math.random(),
+                y: Math.random(),
+                r: 0.3 + Math.random() * 1.2,
+                vx: (Math.random() - 0.5) * 0.00015,
+                vy: (Math.random() - 0.5) * 0.00015,
+                alpha: 0.2 + Math.random() * 0.5
+            }));
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            let t = 0;
+
+            function draw() {
+                const W = canvas.width,
+                    H = canvas.height;
+                ctx.clearRect(0, 0, W, H);
+
+                const bg = ctx.createLinearGradient(0, 0, W, H);
+                bg.addColorStop(0, '#030810');
+                bg.addColorStop(0.5, '#060d14');
+                bg.addColorStop(1, '#040b10');
+                ctx.fillStyle = bg;
+                ctx.fillRect(0, 0, W, H);
+
+                orbs.forEach(o => {
+                    o.x += o.vx;
+                    o.y += o.vy;
+                    if (o.x < 0 || o.x > 1) o.vx *= -1;
+                    if (o.y < 0 || o.y > 1) o.vy *= -1;
+                    const cx = o.x * W,
+                        cy = o.y * H;
+                    const rad = o.r * Math.max(W, H);
+                    const breathe = 1 + 0.05 * Math.sin(t * 0.7 + o.x * 8);
+                    const [r, g, b] = o.c;
+                    const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad * breathe);
+                    gr.addColorStop(0, `rgba(${r},${g},${b},0.35)`);
+                    gr.addColorStop(0.4, `rgba(${r},${g},${b},0.12)`);
+                    gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                    ctx.save();
+                    ctx.filter = 'blur(55px)';
+                    ctx.fillStyle = gr;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, rad * breathe, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                ctx.strokeStyle = 'rgba(37,211,102,0.025)';
+                ctx.lineWidth = 0.5;
+                const gs = 50;
+                for (let x = 0; x < W; x += gs) { ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, H);
+                    ctx.stroke(); }
+                for (let y = 0; y < H; y += gs) { ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(W, y);
+                    ctx.stroke(); }
+
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.x < 0) p.x = 1;
+                    if (p.x > 1) p.x = 0;
+                    if (p.y < 0) p.y = 1;
+                    if (p.y > 1) p.y = 0;
+                    const pulse = p.alpha * (0.7 + 0.3 * Math.sin(t * 1.2 + p.x * 20));
+                    ctx.beginPath();
+                    ctx.arc(p.x * W, p.y * H, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(37,211,102,${pulse})`;
+                    ctx.fill();
+                });
+
+                t += 0.016;
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+    </script>
+
+</body>
+</html>
