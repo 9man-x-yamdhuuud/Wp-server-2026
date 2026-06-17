@@ -1,0 +1,29 @@
+{
+  "name": "whatsapp-bulk-sender",
+  "version": "1.0.0",
+  "description": "WhatsApp bulk messaging with creds.json authentication",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.10",
+    "chalk": "^5.3.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["whatsapp", "bulk", "sender", "baileys"],
+  "author": "Your Name",
+  "license": "MIT"
+}
